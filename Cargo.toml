@@ -1,0 +1,16 @@
+[package]
+name = "crab-os"
+version = "0.1.0"
+edition = "2021"
+
+# Disable stack-unwinding when panic is triggered...
+# ...for the binary generated from development builds
+[profile.dev]
+panic = "abort"
+
+# Disable stack-unwinding when panic is triggered...
+# ...for the binary generated from realease builds
+[profile.release]
+panic = "abort"
+
+[dependencies]
