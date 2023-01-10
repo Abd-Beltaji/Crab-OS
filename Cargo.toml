@@ -14,3 +14,4 @@ edition = "2021"
 # panic = "abort"
 
 [dependencies]
+bootloader = "0.9.23"
