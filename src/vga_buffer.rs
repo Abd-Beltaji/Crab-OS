@@ -1,5 +1,3 @@
-#[allow(dead_code)]
-
 use volatile::Volatile;
 use core::fmt;
 use lazy_static::lazy_static;
@@ -10,6 +8,8 @@ const BUFFER_WIDTH: usize = 80;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(u8)]
+
+#[allow(dead_code)]
 pub enum Color {
     Black = 0,
     Blue = 1,
@@ -32,7 +32,7 @@ pub enum Color {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
-struct ColorCode(u8);
+pub struct ColorCode(u8);
 
 impl ColorCode {
     fn new(foreground: Color, background: Color)-> ColorCode {
@@ -60,7 +60,9 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {
+
+
+    pub fn write_byte_with_color(&mut self, byte: u8, color: ColorCode) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -70,15 +72,19 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                let color_code = self.color_code;
                 self.buffer.chars[BUFFER_HEIGHT - row + 1][col].write(ScreenChar {
                     character_value: byte,
-                    color_code
+                    color_code:color
                 });
                 self.column_position += 1;
             }
         }
     }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        self.write_byte_with_color(byte, self.color_code);
+    }
+
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
@@ -108,20 +114,18 @@ impl Writer {
             }
         }
     }
+
+    fn write_string_with_color(&mut self, s: &str, color: ColorCode) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte_with_color(byte, color),
+                _ => self.write_byte_with_color(0xfe, color), // Value out of range of supported chatracters 
+            }
+        }
+    }
+
 }
 
-pub fn print_something() {
-    use core::fmt::Write;
-    let mut writer = Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
-    writer.write_byte(b'H');
-    writer.write_string("ello ");
-    
-    write!(writer, "The numbers are {} and {}", 42, 1.0/3.0).unwrap();
-}
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -140,7 +144,7 @@ lazy_static! {
 
 
 
-// Redefining the pring / prinln macros since we have ommited the STD library.
+// Redefining the print / println macros since we have ommited the STD library.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -155,5 +159,24 @@ macro_rules! println {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
+    WRITER.lock().write_fmt(args).unwrap();
+}
+
+// Extra macros for printing errors
+#[macro_export]
+macro_rules! error {
+    ($($arg:tt)*) => ($crate::vga_buffer::_error(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! error_nl {
+    () => ($crate::error!("\n"));
+    ($($arg:tt)*) => ($crate::error!("{}\n", format_args!($($arg)*)));
+}
+
+#[doc(hidden)]
+pub fn _error(args: fmt::Arguments) {
+    use core::fmt::Write;
+    WRITER.lock().write_string_with_color("Error! ", ColorCode::new(Color::Red, Color::Black));
     WRITER.lock().write_fmt(args).unwrap();
 }

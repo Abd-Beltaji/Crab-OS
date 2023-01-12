@@ -9,7 +9,7 @@ mod vga_buffer;
 
 #[no_mangle]
 pub extern "C" fn _start() ->! {
-
+    
     println!("Hello from: {}!", "Crab OS");
     panic!("An example of a panic message!");
     loop{}
@@ -17,6 +17,6 @@ pub extern "C" fn _start() ->! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) ->! {
-    println!("{}", info);
+    error_nl!("{}", info);
     loop{}
 }
